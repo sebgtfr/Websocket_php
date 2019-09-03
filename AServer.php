@@ -271,13 +271,29 @@ abstract class                                      AServer
     {
         $this->_running = isset($this->_socket);
         $this->setInterval($tv_sec, $tv_usec);
-        $tv_sec = $this->_intervalSec;
-        $tv_usec = $this->_intervalUsec;
+        $old = intval(microtime(true) * 1000000);
+        $oldDiff = 0;
         while ($this->_running)
         {
             if ($this->_intervalSec !== NULL)
             {
-                // Now et old
+                $now = intval(microtime(true) * 1000000);
+                $diff = ($now - $old) + $oldDiff;
+                $old = $now;
+                $restTime = ($tv_sec === 0 && $tv_usec === 0) ? intval($this->_intervalSec * 1000000 + $this->_intervalUsec) : intval($tv_sec * 1000000 + $tv_usec);
+                $restTime -= $diff;
+                if ($restTime >= 0)
+                {
+                    $tv_sec = $restTime / 1000000;
+                    $tv_usec = $restTime % 1000000;
+                    $oldDiff = 0;
+                }
+                else
+                {
+                    $tv_sec = 0;
+                    $tv_usec = 0;
+                    $oldDiff = -$restTime;
+                }
             }
             $aSocketRead = $this->_aSocketRead;
             $aSocketRead[] = $this->_socket;
@@ -348,6 +364,10 @@ abstract class                                      AServer
                     {
                         $this->forceDeleteSocketOnServer($socketRead);
                     }
+                }
+                if ($tv_sec === 0 && $tv_usec === 0)
+                {
+                    $this->onInterval();
                 }
             }
             else
